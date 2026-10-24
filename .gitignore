@@ -1,0 +1,7 @@
+__pycache__/
+convert/weights/
+ios/Models/
+ios/build/
+ios/Payload/
+ios/*.ipa
+ios/*.xcodeproj/
