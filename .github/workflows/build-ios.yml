@@ -27,11 +27,11 @@ jobs:
       - name: Convert CodeFormer to Core ML and verify against PyTorch
         if: steps.model.outputs.cache-hit != 'true'
         run: |
-          pip install torch==2.5.1 coremltools==8.3.0 numpy==1.26.4 pillow
+          pip install torch==2.5.1 coremltools==8.3.0 numpy==1.26.4 pillow 2>&1 | tee "$RUNNER_TEMP/pip.log"
           git clone --depth 1 https://github.com/sczhou/CodeFormer.git "$RUNNER_TEMP/CodeFormer"
           cd convert
           python convert_coreml.py "$RUNNER_TEMP/CodeFormer" ../ios/Models \
-            "$RUNNER_TEMP/CodeFormer/inputs/cropped_faces/0143.png"
+            "$RUNNER_TEMP/CodeFormer/inputs/cropped_faces/0143.png" 2>&1 | tee "$RUNNER_TEMP/convert.log"
 
       - name: Upload Core ML check images
         if: steps.model.outputs.cache-hit != 'true'
@@ -50,7 +50,8 @@ jobs:
           cd ios
           xcodebuild -project CodeFormerRepair.xcodeproj -scheme CodeFormerRepair \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
-            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/CodeFormer.app Payload/
           zip -qry CodeFormer-unsigned.ipa Payload
@@ -60,3 +61,14 @@ jobs:
         with:
           name: CodeFormer-ipa
           path: ios/CodeFormer-unsigned.ipa
+
+      # Annotations are readable through the public API, unlike raw job logs.
+      - name: Report errors as annotations
+        if: failure()
+        run: |
+          for f in "$RUNNER_TEMP"/*.log; do
+            [ -f "$f" ] || continue
+            if grep -q "error:" "$f"; then body=$(grep -E "error:" "$f" | head -n 40); else body=$(tail -n 40 "$f"); fi
+            msg=$(printf '%s\n' "$body" | sed -e 's/%/%25/g' -e 's/\r//g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=$(basename "$f")::$msg"
+          done
