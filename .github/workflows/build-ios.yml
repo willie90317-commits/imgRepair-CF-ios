@@ -9,6 +9,9 @@ jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash   # explicit bash enables pipefail, so `cmd | tee log` still fails the step
     steps:
       - uses: actions/checkout@v4
 
@@ -17,7 +20,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ios/Models/CodeFormer.mlpackage
-          key: coreml-${{ hashFiles('convert/cf_loader.py', 'convert/export_model.py', 'convert/convert_coreml.py') }}
+          key: coreml-v2-${{ hashFiles('convert/cf_loader.py', 'convert/export_model.py', 'convert/convert_coreml.py') }}
 
       - uses: actions/setup-python@v5
         if: steps.model.outputs.cache-hit != 'true'
